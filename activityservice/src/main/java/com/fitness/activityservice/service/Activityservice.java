@@ -5,6 +5,9 @@ import com.fitness.activityservice.model.Activity;
 import com.fitness.activityservice.dto.ActivityRequest;
 import com.fitness.activityservice.dto.ActivityResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -13,9 +16,11 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class Activityservice {
     private final ActivityRepository repo;
     private final UserValidate userValidate;
+    private final RabbitTemplate rabbitTemplate;
 
     @Value("${rabbitmq.exchange.name}")
     private String exchange;
@@ -36,6 +41,13 @@ public class Activityservice {
                     .build();
 
             Activity saved =repo.save(activity);
+
+            //publish to RabbitMQ for AI processing
+        try{
+            rabbitTemplate.convertAndSend(exchange, routingKey, saved );
+        }catch(Exception e){
+            log.error("Failer to publish activity to RabbitMQ :",e);
+        }
             return mapToResponse(saved);
 
     }
